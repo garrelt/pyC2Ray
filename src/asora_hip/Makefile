@@ -1,0 +1,43 @@
+# Define the C++ and HIP compilers
+CXX=g++
+HIPCC=hipcc
+
+# Paths to Python and NumPy includes
+PYTHONINC=-I/home/mbianco/anaconda3/include/python3.11
+NUMPYINC=-I/home/mbianco/anaconda3/lib/python3.11/site-packages/numpy/core/include
+
+# Include Paths for both local and piz daint
+INC+=$(PYTHONINC) $(NUMPYINC)
+
+# C++ Compilation Flags
+CXXFLAGS=-std=c++14 -O2 -pedantic -fPIC -D PERIODIC -D RATES # -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror -Wno-unused
+
+# HIP Compilation Flags
+HIPFLAGS=-std=c++14 -O2 -Xcompiler -fPIC -D PERIODIC -D LOCALRATES --gpu-architecture=gpu --hip-arch=gfx90a # Adjust the arch as needed, e.g., `gfx90a` for SM 8.6 
+
+# Define the target
+all: libasora.so
+
+# Linking the shared library
+libasora.so: memory.o rates.o raytracing.o python_module.o
+	$(HIPCC) $(HIPFLAGS) $(INC) -shared -o libasora.so memory.o rates.o raytracing.o python_module.o
+
+# HIP compilation for source files
+raytracing.o: raytracing.hip.cpp
+	$(HIPCC) $(HIPFLAGS) $(INC) -dc raytracing.hip.cpp
+
+rates.o: rates.hip.cpp
+	$(HIPCC) $(HIPFLAGS) $(INC) -dc rates.hip.cpp
+
+memory.o: memory.hip.cpp
+	$(HIPCC) $(HIPFLAGS) $(INC) -dc memory.hip.cpp
+
+python_module.o: python_module.cpp
+	$(HIPCC) $(HIPFLAGS) $(INC) -c python_module.cpp
+
+# Clean up build artifacts
+clean:
+	rm -f *.so *.o
+
+# Phony targets
+.PHONY: all clean
